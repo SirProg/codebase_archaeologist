@@ -1,0 +1,124 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Codebase Archaeologist — agente que convierte el historial de un repo en una crónica épica.
+
+Parameters:
+  AllowedOrigins:
+    Type: CommaDelimitedList
+    Default: "http://localhost:5173"
+    Description: >
+      Orígenes permitidos por CORS. En despliegue, pasa el dominio de Vercel
+      junto al de desarrollo, p. ej.
+      "https://tu-app.vercel.app,http://localhost:5173".
+  ModelId:
+    Type: String
+    Default: amazon.nova-lite-v1:0
+    Description: >
+      ID del modelo de Bedrock. Si tu región exige perfil de inferencia
+      cross-region, usa us.amazon.nova-lite-v1:0.
+  GitHubTokenParam:
+    Type: String
+    Default: /codebase-archaeologist/github-token
+    # Debe empezar por "/": el ARN de la política se construye concatenando
+    # "parameter" + este valor. Sin la barra saldría un ARN malformado
+    # ("parametertoken_...") y la Lambda recibiría un AccessDenied en runtime,
+    # ya desplegada. Mejor fallar aquí, en el deploy, con un mensaje claro.
+    AllowedPattern: "^/[a-zA-Z0-9_.\\-/]+$"
+    ConstraintDescription: >
+      Debe empezar por "/" y contener solo letras, números y los caracteres _ . - /
+      Ej: /codebase-archaeologist/github-token
+    Description: Parámetro SSM (SecureString) con el PAT de GitHub. Debe empezar por "/".
+
+Globals:
+  Function:
+    Runtime: python3.12
+    # El default de 3 s falla de inmediato; Bedrock más GitHub necesitan margen.
+    Timeout: 60
+    # En Lambda la CPU escala con la memoria; 512 MB acelera parseo y render.
+    MemorySize: 512
+    Architectures: [arm64]
+
+Resources:
+  ArchaeologistApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: !Ref AllowedOrigins
+        AllowHeaders: [Content-Type]
+        AllowMethods: [POST, OPTIONS]
+      # Un endpoint público que invoca un LLM sin límites es una invitación
+      # a que alguien queme la cuenta.
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 5
+        ThrottlingRateLimit: 2
+
+  ExpedientesBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: BorrarExpedientesViejos
+            Status: Enabled
+            ExpirationInDays: 30
+
+  ArchaeologistFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: app.lambda_handler
+      Environment:
+        Variables:
+          BUCKET_NAME: !Ref ExpedientesBucket
+          MODEL_ID: !Ref ModelId
+          GITHUB_TOKEN_PARAM: !Ref GitHubTokenParam
+          MAX_COMMITS: "10"
+          MAX_README_CHARS: "4000"
+          MAX_TOKENS: "1500"
+          URL_EXPIRACION_SEGUNDOS: "604800"
+      Policies:
+        - AWSLambdaBasicExecutionRole
+        - Statement:
+            - Effect: Allow
+              Action: bedrock:InvokeModel
+              Resource:
+                # El ARN de un foundation model no lleva account ID (doble "::").
+                - !Sub "arn:aws:bedrock:${AWS::Region}::foundation-model/${ModelId}"
+                # Los perfiles de inferencia cross-region sí lo llevan, y exigen
+                # además permiso sobre el modelo subyacente en cada región.
+                - !Sub "arn:aws:bedrock:${AWS::Region}:${AWS::AccountId}:inference-profile/${ModelId}"
+                - !Sub "arn:aws:bedrock:*::foundation-model/${ModelId}"
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:PutObject
+                # GetObject hace falta aunque solo subamos: la URL prefirmada
+                # de descarga se firma contra ese permiso.
+                - s3:GetObject
+              # El recurso es bucket/*, no el bucket: son operaciones sobre objetos.
+              Resource: !Sub "${ExpedientesBucket.Arn}/*"
+        - Statement:
+            - Effect: Allow
+              Action: ssm:GetParameter
+              Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter${GitHubTokenParam}"
+      Events:
+        Excavate:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref ArchaeologistApi
+            Path: /excavate
+            Method: POST
+
+Outputs:
+  ApiUrl:
+    Description: Endpoint público. Ponlo en VITE_API_URL del frontend.
+    Value: !Sub "https://${ArchaeologistApi}.execute-api.${AWS::Region}.amazonaws.com"
+  BucketName:
+    Description: Bucket donde viven los expedientes.
+    Value: !Ref ExpedientesBucket
+  FunctionName:
+    Value: !Ref ArchaeologistFunction

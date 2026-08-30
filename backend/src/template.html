@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Expediente · {{REPO}}</title>
+<style>
+  /* Un solo archivo, sin CDNs: este HTML tiene que abrirse aunque S3 sea lo
+     único que responda. */
+  :root {
+    --papel:      #f2ead8;
+    --papel-alto: #f7f1e2;
+    --tinta:      #2b2419;
+    --tinta-suave:#5c5142;
+    --sepia:      #8a6a3b;
+    --sello:      #96341f;
+    --linea:      #d6c9ad;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 3rem 1.25rem 5rem;
+    background-color: #ded3b8;
+    /* Manchas de humedad: dos radiales muy suaves sobre el papel. */
+    background-image:
+      radial-gradient(ellipse at 12% 8%,  rgba(138,106,59,.10), transparent 55%),
+      radial-gradient(ellipse at 88% 92%, rgba(138,106,59,.08), transparent 55%);
+    color: var(--tinta);
+    font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    font-size: 19px;
+    line-height: 1.7;
+  }
+
+  .expediente {
+    max-width: 40rem;          /* ~68 caracteres de ancho de línea */
+    margin: 0 auto;
+    padding: 3.5rem 3rem 3rem;
+    background: var(--papel);
+    background-image: linear-gradient(160deg, var(--papel-alto), var(--papel) 45%, #ece2cb);
+    border: 1px solid var(--linea);
+    box-shadow: 0 1px 2px rgba(43,36,25,.10), 0 18px 45px -20px rgba(43,36,25,.45);
+  }
+
+  /* --- Cabecera: membrete de archivo --- */
+  .membrete {
+    border-bottom: 2px solid var(--tinta);
+    padding-bottom: 1rem;
+    margin-bottom: 2.5rem;
+  }
+  .membrete .clasificacion {
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: .68rem;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--tinta-suave);
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem 1.5rem;
+    justify-content: space-between;
+  }
+  .membrete .sujeto {
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: 1rem;
+    margin-top: .9rem;
+    color: var(--sepia);
+    word-break: break-all;
+  }
+
+  .sello {
+    display: inline-block;
+    margin-top: 1.1rem;
+    padding: .3rem .8rem;
+    border: 2px solid var(--sello);
+    border-radius: 3px;
+    color: var(--sello);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .7rem;
+    letter-spacing: .18em;
+    text-transform: uppercase;
+    transform: rotate(-2.5deg);
+    opacity: .85;
+  }
+
+  /* --- Cuerpo del relato --- */
+  .cuerpo h1 {
+    font-size: 2.1rem;
+    line-height: 1.2;
+    margin: 0 0 1.5rem;
+    font-weight: 600;
+  }
+  .cuerpo h2 {
+    font-size: 1.3rem;
+    margin: 2.6rem 0 .8rem;
+    font-weight: 600;
+    color: var(--sepia);
+  }
+  .cuerpo h2::before {
+    content: "§ ";
+    opacity: .5;
+  }
+  .cuerpo h3 { font-size: 1.1rem; margin: 2rem 0 .6rem; }
+  .cuerpo p  { margin: 0 0 1.25rem; text-align: justify; hyphens: auto; }
+
+  /* La primera línea del relato, en versalitas: es un expediente, no un post. */
+  .cuerpo > p:first-of-type::first-line {
+    font-variant: small-caps;
+    letter-spacing: .03em;
+  }
+
+  .cuerpo code {
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: .82em;
+    background: rgba(138,106,59,.13);
+    padding: .1em .35em;
+    border-radius: 2px;
+    color: var(--sepia);
+  }
+  .cuerpo pre {
+    overflow-x: auto;
+    background: rgba(138,106,59,.10);
+    padding: 1rem;
+    border-left: 3px solid var(--sepia);
+  }
+  .cuerpo pre code { background: none; padding: 0; }
+
+  .cuerpo blockquote {
+    margin: 1.5rem 0;
+    padding-left: 1.2rem;
+    border-left: 3px solid var(--linea);
+    color: var(--tinta-suave);
+    font-style: italic;
+  }
+  .cuerpo ul, .cuerpo ol { margin: 0 0 1.25rem; padding-left: 1.4rem; }
+  .cuerpo li { margin-bottom: .4rem; }
+  .cuerpo a { color: var(--sello); }
+  .cuerpo hr { border: none; border-top: 1px solid var(--linea); margin: 2.5rem 0; }
+
+  /* --- Anexo de commits --- */
+  .anexo {
+    margin-top: 3.5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--linea);
+  }
+  .anexo h2 {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .7rem;
+    letter-spacing: .22em;
+    text-transform: uppercase;
+    color: var(--tinta-suave);
+    margin: 0 0 1rem;
+  }
+  .anexo ol { list-style: none; margin: 0; padding: 0; }
+  .anexo li {
+    font-family: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    font-size: .78rem;
+    line-height: 1.6;
+    padding: .35rem 0;
+    border-bottom: 1px dotted var(--linea);
+    color: var(--tinta-suave);
+  }
+  .anexo .sha { color: var(--sello); }
+  .anexo .autor { color: var(--sepia); }
+
+  .pie {
+    margin-top: 3rem;
+    padding-top: 1.2rem;
+    border-top: 2px solid var(--tinta);
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .68rem;
+    letter-spacing: .1em;
+    color: var(--tinta-suave);
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 640px) {
+    body { padding: 1rem .5rem 3rem; font-size: 17px; }
+    .expediente { padding: 2rem 1.4rem; }
+    .cuerpo h1 { font-size: 1.7rem; }
+    .cuerpo p { text-align: left; }
+  }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    .expediente { box-shadow: none; border: none; max-width: none; }
+  }
+</style>
+</head>
+<body>
+  <article class="expediente">
+    <header class="membrete">
+      <div class="clasificacion">
+        <span>Expediente de arqueología de software</span>
+        <span>Ref. {{REF}}</span>
+      </div>
+      <div class="sujeto">{{REPO}}</div>
+      <div class="sello">Excavado</div>
+    </header>
+
+    <div class="cuerpo">
+      {{CUERPO}}
+    </div>
+
+    <section class="anexo">
+      <h2>Anexo · Estratos examinados</h2>
+      <ol>
+        {{COMMITS}}
+      </ol>
+    </section>
+
+    <footer class="pie">
+      Redactado el {{FECHA}} · Amazon Nova · Codebase Archaeologist
+    </footer>
+  </article>
+</body>
+</html>

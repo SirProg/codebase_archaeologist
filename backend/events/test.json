@@ -1,0 +1,11 @@
+{
+  "version": "2.0",
+  "routeKey": "POST /excavate",
+  "rawPath": "/excavate",
+  "headers": { "content-type": "application/json" },
+  "requestContext": {
+    "http": { "method": "POST", "path": "/excavate" }
+  },
+  "body": "{\"repo_url\": \"https://github.com/psf/requests\"}",
+  "isBase64Encoded": false
+}
