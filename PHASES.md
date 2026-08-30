@@ -282,6 +282,8 @@ Subsequent redeploys are just `sam build && sam deploy`.
 ### Traps
 
 - **This is where the IAM errors that `sam local` hid show up.** `sam logs --tail` is your best friend.
+- **The most likely first-deploy failure is `iam:CreateRole`.** Having read permissions on IAM does not imply being able to create the execution role, and the Phase 0 checks won't catch it. If your user is scoped down, request the policy in `CONFIGURATION.md` §3 before trying.
+- If the deploy fails, the stack is left in `ROLLBACK_COMPLETE` and **cannot be retried without deleting it**: `aws cloudformation delete-stack --stack-name codebase-archaeologist`.
 - Measure the real response time. If it gets close to 29 seconds, lower `maxTokens` or switch to a Lambda Function URL before it becomes a problem during the demo.
 - Cold start: the first invocation after a period of inactivity takes longer. In a live demo, make a warm-up call before you begin.
 

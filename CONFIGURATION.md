@@ -187,7 +187,7 @@ If your access is through SSO / Identity Center, use `aws configure sso` instead
 
 Use an IAM user with administrator permissions for development, or at least with access to: IAM, Lambda, S3, Bedrock, API Gateway, CloudFormation and SSM.
 
-To check none of them is missing, all at once:
+To rule out the **read** permissions all at once:
 
 ```bash
 probe() { printf "%-28s " "$1"; shift; "$@" >/dev/null 2>&1 && echo "OK" || echo "MISSING"; }
@@ -196,12 +196,54 @@ probe "bedrock:InvokeModel"       aws bedrock-runtime converse --region us-east-
 probe "s3"                        aws s3api list-buckets
 probe "lambda"                    aws lambda list-functions --max-items 1
 probe "cloudformation"            aws cloudformation list-stacks --max-items 1
-probe "iam"                       aws iam list-roles --max-items 1
 probe "apigatewayv2"              aws apigatewayv2 get-apis --max-results 1
 probe "ssm"                       aws ssm describe-parameters --max-results 1
 ```
 
-A scoped-down user typically fails precisely on SSM, which is where the token lives.
+⚠️ **This block does not prove you can deploy.** Every one of those calls is read-only, and a scoped-down user can pass them all and still fail during `sam deploy`. The classic case is IAM: `iam:ListRoles` works, but **`iam:CreateRole` does not**, and the deployment dies halfway through with a rollback.
+
+There's no way to check `iam:CreateRole` without actually creating a role (IAM has no dry run, and `iam:SimulatePrincipalPolicy` is itself a permission a scoped-down user rarely has). So the only real test is the deployment itself — or requesting the permissions up front.
+
+### Permissions required to deploy
+
+On top of the read permissions, `sam deploy` needs to create and tag the Lambda execution role. This policy, scoped to this stack's roles, is what to ask the account administrator for:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SamDeployRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:GetRole",
+        "iam:PassRole",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies"
+      ],
+      "Resource": "arn:aws:iam::YOUR_ACCOUNT_ID:role/codebase-archaeologist-*"
+    }
+  ]
+}
+```
+
+Three details that save a second round of requests:
+
+- **`iam:TagRole` is not optional.** CloudFormation tags every resource it creates; without that action the deploy fails with `UnauthorizedTaggingOperation` even if you have `CreateRole`.
+- **`iam:PassRole`** is needed to hand the role to Lambda.
+- The delete actions are required for rollback and for `sam delete`. Without them, a future failure leaves the stack stuck.
+
+Scoping `Resource` to `codebase-archaeologist-*` is usually enough to get it approved without discussion: it grants no power over any other role in the account.
+
+A scoped-down user also tends to fail on SSM, which is where the token lives.
 
 ---
 
@@ -486,6 +528,9 @@ frontend/.env.local
 | Vercel build: can't find `package.json` | Root Directory not configured | Set it to `frontend` (section 9) |
 | You change `VITE_API_URL` and nothing happens | `VITE_*` are baked in at build time | Redeploy on Vercel; saving the variable isn't enough |
 | `AccessDenied` uploading to S3 | The policy ARN points at the bucket, not `bucket/*` | Section 5 |
+| `not authorized to perform: iam:CreateRole` during deploy | Your user can read roles but not create them | Request the policy in section 3. Read permissions are not enough |
+| `UnauthorizedTaggingOperation` creating the role | `iam:TagRole` is missing | It's in the same policy in section 3 |
+| The stack is stuck in `ROLLBACK_COMPLETE` | Creation failed and CloudFormation undid everything | Delete it before retrying: `aws cloudformation delete-stack --stack-name codebase-archaeologist`. A stack in that state cannot be updated |
 
 ### Where to look when something breaks
 
@@ -510,6 +555,7 @@ aws cloudformation describe-stack-events \
 - [ ] GitHub PAT created and stored in SSM as a SecureString
 - [ ] `GITHUB_TOKEN` exported in your local environment
 - [ ] AWS CLI configured and `sts get-caller-identity` works
+- [ ] **Write** permissions to deploy, not just read (`iam:CreateRole` and `iam:TagRole` included — section 3)
 - [ ] SAM CLI installed
 - [ ] Python 3.12 available (`sam build` requires the exact version)
 - [ ] Virtualenv created in `backend/` with the dependencies

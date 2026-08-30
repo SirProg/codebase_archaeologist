@@ -180,7 +180,7 @@ Si tu acceso es por SSO / Identity Center, usa `aws configure sso` en su lugar, 
 
 Usa un usuario IAM con permisos de administrador para desarrollar, o al menos con acceso a: IAM, Lambda, S3, Bedrock, API Gateway, CloudFormation y SSM.
 
-Para comprobar de golpe que no falta ninguno:
+Para descartar de golpe los permisos de **lectura**:
 
 ```bash
 probe() { printf "%-28s " "$1"; shift; "$@" >/dev/null 2>&1 && echo "OK" || echo "FALTA"; }
@@ -189,12 +189,54 @@ probe "bedrock:InvokeModel"       aws bedrock-runtime converse --region us-east-
 probe "s3"                        aws s3api list-buckets
 probe "lambda"                    aws lambda list-functions --max-items 1
 probe "cloudformation"            aws cloudformation list-stacks --max-items 1
-probe "iam"                       aws iam list-roles --max-items 1
 probe "apigatewayv2"              aws apigatewayv2 get-apis --max-results 1
 probe "ssm"                       aws ssm describe-parameters --max-results 1
 ```
 
-Un usuario acotado suele fallar precisamente en SSM, que es donde vive el token.
+⚠️ **Este bloque no prueba que puedas desplegar.** Todas esas llamadas son de lectura, y un usuario acotado puede pasarlas enteras y aun así fallar en el `sam deploy`. El caso típico es IAM: `iam:ListRoles` funciona, pero **`iam:CreateRole` no**, y el despliegue muere a medio camino con un rollback.
+
+No hay forma de comprobar `iam:CreateRole` sin crear un rol de verdad (IAM no tiene *dry run*, y `iam:SimulatePrincipalPolicy` es a su vez un permiso que un usuario acotado no suele tener). Así que la única prueba real es el propio despliegue — o pedir los permisos por adelantado.
+
+### Permisos necesarios para desplegar
+
+Además de los de lectura, `sam deploy` necesita crear y etiquetar el rol de ejecución de la Lambda. Esta política, acotada a los roles de este stack, es lo que hay que pedirle al administrador de la cuenta:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SamDeployRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:GetRole",
+        "iam:PassRole",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:ListRolePolicies",
+        "iam:ListAttachedRolePolicies"
+      ],
+      "Resource": "arn:aws:iam::TU_ACCOUNT_ID:role/codebase-archaeologist-*"
+    }
+  ]
+}
+```
+
+Tres detalles que evitan una segunda ronda de peticiones:
+
+- **`iam:TagRole` no es opcional.** CloudFormation etiqueta cada recurso que crea; sin esa acción el deploy falla con `UnauthorizedTaggingOperation` aunque tengas `CreateRole`.
+- **`iam:PassRole`** hace falta para entregarle el rol a Lambda.
+- Las acciones de borrado son necesarias para el rollback y para `sam delete`. Sin ellas, un fallo futuro te deja el stack atascado.
+
+El `Resource` acotado a `codebase-archaeologist-*` suele bastar para que lo aprueben sin discusión: no da poder sobre ningún otro rol de la cuenta.
+
+Un usuario acotado también suele fallar en SSM, que es donde vive el token.
 
 ---
 
@@ -475,6 +517,9 @@ frontend/.env.local
 | El navegador descarga el HTML en vez de mostrarlo | Falta `ContentType` | Añádelo al `put_object` |
 | CORS error en el frontend | Preflight no configurado | Sección 8 |
 | `AccessDenied` al subir a S3 | ARN de la política apunta al bucket, no a `bucket/*` | Sección 5 |
+| `not authorized to perform: iam:CreateRole` en el deploy | Tu usuario puede leer roles pero no crearlos | Pide la política de la sección 3. Los permisos de lectura no bastan |
+| `UnauthorizedTaggingOperation` al crear el rol | Falta `iam:TagRole` | Va en la misma política de la sección 3 |
+| El stack queda en `ROLLBACK_COMPLETE` | Falló la creación y CloudFormation deshizo todo | Bórralo antes de reintentar: `aws cloudformation delete-stack --stack-name codebase-archaeologist`. Un stack en ese estado no se puede actualizar |
 | `401 Bad credentials` de GitHub | El PAT caducó (se emiten a 90 días) | Genera uno nuevo y actualiza el parámetro SSM |
 | El frontend dice «Falta VITE_API_URL» | La variable no está definida en el build | Sección 9 |
 | Build de Vercel: no encuentra `package.json` | Root Directory sin configurar | Ponlo en `frontend` (sección 9) |
@@ -503,6 +548,7 @@ aws cloudformation describe-stack-events \
 - [ ] PAT de GitHub creado y guardado en SSM como SecureString
 - [ ] `GITHUB_TOKEN` exportado en el entorno local
 - [ ] AWS CLI configurado y `sts get-caller-identity` funciona
+- [ ] Permisos de **escritura** para desplegar, no solo de lectura (`iam:CreateRole` y `iam:TagRole` incluidos — sección 3)
 - [ ] SAM CLI instalado
 - [ ] Python 3.12 disponible (`sam build` exige la versión exacta)
 - [ ] Virtualenv creado en `backend/` con las dependencias
