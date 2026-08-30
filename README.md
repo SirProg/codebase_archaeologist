@@ -4,6 +4,8 @@
 
 > An autonomous agent that reads a GitHub repository's history and writes an epic account of how that code evolved.
 
+**▶ Try it live: [codebase-archaeologist-two.vercel.app](https://codebase-archaeologist-two.vercel.app)**
+
 Give it the URL of any public repository. The agent pulls the latest commits and the README, hands them to Amazon Nova with instructions to act as a dramatic historian, and returns the account — rendered in the app and archived as a standalone HTML case file on S3.
 
 ---
@@ -58,8 +60,8 @@ The SPA renders the Markdown and links to the archived case file.
 codebase-archaeologist/
 ├── README.md
 ├── README.es.md
-├── CONFIGURACION.md              # Accounts, permissions and environment setup
-├── FASES.md                      # Development plan, phase by phase
+├── CONFIGURATION.md              # Accounts, permissions and environment setup
+├── CONFIGURACION.md              # (español)
 ├── .gitignore
 │
 ├── backend/                      # Everything that runs on AWS
@@ -112,7 +114,8 @@ sam build
 sam deploy --guided
 ```
 
-The deployment returns the endpoint URL in the `ApiUrl` output.
+The deployment returns the endpoint URL in the `ApiUrl` output. This instance runs at
+`https://lt9c01rdwe.execute-api.us-east-1.amazonaws.com`.
 
 ### Frontend
 
@@ -129,10 +132,10 @@ To deploy: import the repo on Vercel, set **Root Directory** to `frontend`, add 
 
 ## Usage
 
-The frontend is the intended way in, but the endpoint stands on its own:
+The frontend is the intended way in, but the live endpoint stands on its own:
 
 ```bash
-curl -X POST https://xxxxx.execute-api.us-east-1.amazonaws.com/excavate \
+curl -X POST https://lt9c01rdwe.execute-api.us-east-1.amazonaws.com/excavate \
   -H "Content-Type: application/json" \
   -d '{"repo_url": "https://github.com/torvalds/linux"}'
 ```
@@ -200,18 +203,6 @@ At demo-level usage the project costs essentially nothing:
 
 ---
 
-## Roadmap
-
-- [x] S3 cache: if the repo was already excavated today, return the existing case file
-- [ ] Response streaming via Lambda Function URL
-- [ ] Contributor analysis ("the characters in this story")
-- [ ] Detect dramatic moments: commits containing `revert`, `hotfix`, `WIP`, `fix fix fix`
-- [ ] Multiple narrative voices: noir, Norse epic, nature documentary
-- [ ] CloudFront + custom domain for permanent links
-
----
-
 ## Documentation
 
 - [`CONFIGURATION.md`](./CONFIGURATION.md) — Accounts, permissions, IAM, environment variables, Vercel and troubleshooting
-- [`PHASES.md`](./PHASES.md) — Development plan broken into phases with acceptance criteria

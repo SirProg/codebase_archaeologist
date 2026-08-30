@@ -4,6 +4,8 @@
 
 > Un agente autónomo que lee la historia de un repositorio de GitHub y escribe un relato épico sobre cómo evolucionó ese código.
 
+**▶ Pruébalo en vivo: [codebase-archaeologist-two.vercel.app](https://codebase-archaeologist-two.vercel.app)**
+
 Le pasas la URL de cualquier repositorio público. El agente recupera los últimos commits y el README, se los entrega a Amazon Nova con la instrucción de actuar como un historiador dramático, y te devuelve el relato — renderizado en la app y archivado como expediente HTML independiente en S3.
 
 ---
@@ -60,8 +62,6 @@ codebase-archaeologist/
 ├── README.es.md
 ├── CONFIGURACION.md              # Setup de cuentas, permisos y entorno
 ├── CONFIGURATION.md              # (English)
-├── FASES.md                      # Plan de desarrollo, fase por fase
-├── PHASES.md                     # (English)
 ├── .gitignore
 │
 ├── backend/                      # Todo lo que corre en AWS
@@ -114,7 +114,8 @@ sam build
 sam deploy --guided
 ```
 
-El despliegue te devuelve la URL del endpoint en el output `ApiUrl`.
+El despliegue te devuelve la URL del endpoint en el output `ApiUrl`. Esta instancia corre en
+`https://lt9c01rdwe.execute-api.us-east-1.amazonaws.com`.
 
 ### Frontend
 
@@ -131,10 +132,10 @@ Para desplegar: importa el repo en Vercel, pon **Root Directory** en `frontend`,
 
 ## Uso
 
-El frontend es la vía prevista, pero el endpoint se sostiene solo:
+El frontend es la vía prevista, pero el endpoint en vivo se sostiene solo:
 
 ```bash
-curl -X POST https://xxxxx.execute-api.us-east-1.amazonaws.com/excavate \
+curl -X POST https://lt9c01rdwe.execute-api.us-east-1.amazonaws.com/excavate \
   -H "Content-Type: application/json" \
   -d '{"repo_url": "https://github.com/torvalds/linux"}'
 ```
@@ -202,18 +203,6 @@ Con el uso de un demo, el proyecto cuesta esencialmente nada:
 
 ---
 
-## Roadmap
-
-- [x] Cache en S3: si el repo ya fue excavado hoy, devolver el expediente existente
-- [ ] Streaming de la respuesta con Lambda Function URL
-- [ ] Análisis de contribuidores ("los personajes de esta historia")
-- [ ] Detección de "momentos dramáticos": commits con `revert`, `hotfix`, `WIP`, `fix fix fix`
-- [ ] Múltiples voces narrativas: noir, épica nórdica, documental de naturaleza
-- [ ] CloudFront + dominio propio para links permanentes
-
----
-
 ## Documentación
 
 - [`CONFIGURACION.md`](./CONFIGURACION.md) — Cuentas, permisos, IAM, variables de entorno, Vercel y troubleshooting
-- [`FASES.md`](./FASES.md) — Plan de desarrollo dividido en fases con criterios de aceptación
