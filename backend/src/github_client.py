@@ -33,9 +33,9 @@ def parse_repo_url(url: str) -> tuple[str, str]:
 
     url = url.strip()
     if not url:
-        raise UrlInvalida("Pega la URL de un repositorio para empezar.")
+        raise UrlInvalida("vacia")
     if len(url) > MAX_URL_CHARS:
-        raise UrlInvalida("Esa URL es demasiado larga.")
+        raise UrlInvalida("larga")
 
     # git@github.com:owner/repo.git → github.com/owner/repo.git
     scp = re.match(r"^[A-Za-z0-9_.-]+@([^:]+):(.+)$", url)
@@ -53,16 +53,16 @@ def parse_repo_url(url: str) -> tuple[str, str]:
     if host not in _HOSTS:
         # Sin host reconocible tampoco aceptamos "owner/repo" a secas: es
         # demasiado fácil colar ahí una ruta de otro servicio.
-        raise UrlInvalida("Solo se pueden excavar repositorios de github.com.")
+        raise UrlInvalida("no_github")
 
     if len(partes) < 3:
-        raise UrlInvalida("Falta el nombre del repositorio en la URL.")
+        raise UrlInvalida("sin_repo")
 
     owner = partes[1]
     repo = re.sub(r"\.git$", "", partes[2])  # los segmentos posteriores se descartan
 
     if not _OWNER.match(owner) or not _REPO.match(repo):
-        raise UrlInvalida("El formato owner/repo de esa URL no es válido.")
+        raise UrlInvalida("formato")
 
     return owner, repo
 
@@ -82,7 +82,7 @@ def _get(path: str, token: str) -> requests.Response:
     try:
         resp = requests.get(f"{API}{path}", headers=_headers(token), timeout=TIMEOUT)
     except requests.Timeout as exc:
-        raise GitHubCaido("GitHub tardó demasiado en responder.") from exc
+        raise GitHubCaido("timeout") from exc
     except requests.RequestException as exc:
         raise GitHubCaido() from exc
 
@@ -96,7 +96,7 @@ def _get(path: str, token: str) -> requests.Response:
         raise RateLimit()
     if resp.status_code >= 400:
         log.warning("GitHub %s devolvió %s: %s", path, resp.status_code, resp.text[:200])
-        raise GitHubCaido(f"GitHub respondió {resp.status_code}.")
+        raise GitHubCaido("status", status=resp.status_code)
 
     return resp
 

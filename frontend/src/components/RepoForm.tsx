@@ -1,31 +1,34 @@
 import { useState } from "react";
 import { pareceRepoGitHub } from "../api";
+import { TEXTOS, type Idioma } from "../i18n";
 
 interface Props {
   cargando: boolean;
+  idioma: Idioma;
   onSubmit: (url: string) => void;
 }
 
-export function RepoForm({ cargando, onSubmit }: Props) {
+export function RepoForm({ cargando, idioma, onSubmit }: Props) {
   const [valor, setValor] = useState("");
-  const [aviso, setAviso] = useState<string | null>(null);
+  const [aviso, setAviso] = useState(false);
+  const t = TEXTOS[idioma];
 
   function enviar(e: React.FormEvent) {
     e.preventDefault();
     if (cargando) return;
 
     if (!pareceRepoGitHub(valor)) {
-      setAviso("Necesito una URL de github.com con la forma owner/repo.");
+      setAviso(true);
       return;
     }
-    setAviso(null);
+    setAviso(false);
     onSubmit(valor);
   }
 
   return (
     <form className="formulario" onSubmit={enviar} noValidate>
       <label className="etiqueta" htmlFor="repo">
-        Sujeto de la excavación
+        {t.etiquetaCampo}
       </label>
       <div className="fila">
         <input
@@ -35,23 +38,25 @@ export function RepoForm({ cargando, onSubmit }: Props) {
           inputMode="url"
           autoComplete="off"
           spellCheck={false}
-          placeholder="https://github.com/psf/requests"
+          placeholder={t.placeholder}
           value={valor}
           disabled={cargando}
-          aria-invalid={aviso !== null}
+          aria-invalid={aviso}
           aria-describedby={aviso ? "aviso-form" : undefined}
           onChange={(e) => {
             setValor(e.target.value);
-            if (aviso) setAviso(null);
+            if (aviso) setAviso(false);
           }}
         />
         <button className="boton" type="submit" disabled={cargando || valor.trim() === ""}>
-          {cargando ? "Excavando…" : "Excavar"}
+          {cargando ? t.botonExcavando : t.botonExcavar}
         </button>
       </div>
+      {/* El aviso se guarda como booleano, no como texto: así se traduce solo
+          cuando el usuario cambia de idioma con el aviso en pantalla. */}
       {aviso && (
         <p className="aviso" id="aviso-form" role="alert">
-          {aviso}
+          {t.avisoUrl}
         </p>
       )}
     </form>

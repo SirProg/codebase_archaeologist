@@ -9,6 +9,8 @@ export interface ExpedienteResponse {
   narrativa: string;
   commits_analizados: number;
   expira_en: string;
+  /** Idioma en el que se generó el relato. */
+  idioma: string;
   /** true si el expediente ya existía en S3 y no se volvió a generar. */
   cache: boolean;
 }

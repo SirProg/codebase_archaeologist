@@ -1,3 +1,4 @@
+import { TEXTOS, type Idioma } from "./i18n";
 import type { CodigoError, ExpedienteResponse } from "./types";
 
 const BASE = import.meta.env.VITE_API_URL as string | undefined;
@@ -24,12 +25,11 @@ export function pareceRepoGitHub(valor: string): boolean {
   );
 }
 
-export async function excavar(repoUrl: string): Promise<ExpedienteResponse> {
+export async function excavar(repoUrl: string, idioma: Idioma): Promise<ExpedienteResponse> {
+  const t = TEXTOS[idioma];
+
   if (!BASE) {
-    throw new ExcavacionError(
-      "sin_configurar",
-      "Falta VITE_API_URL. Copia .env.example a .env.local y apúntalo a tu endpoint.",
-    );
+    throw new ExcavacionError("sin_configurar", t.errorSinConfigurar);
   }
 
   const control = new AbortController();
@@ -40,18 +40,13 @@ export async function excavar(repoUrl: string): Promise<ExpedienteResponse> {
     resp = await fetch(`${BASE.replace(/\/$/, "")}/excavate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ repo_url: repoUrl.trim() }),
+      body: JSON.stringify({ repo_url: repoUrl.trim(), idioma }),
       signal: control.signal,
     });
   } catch (err) {
     // AbortError, fallo de DNS o un preflight de CORS rechazado caen aquí.
     const abortado = err instanceof DOMException && err.name === "AbortError";
-    throw new ExcavacionError(
-      "red",
-      abortado
-        ? "La excavación tardó demasiado. Prueba con un repositorio más pequeño."
-        : "No se pudo contactar con el servicio. Revisa tu conexión o la configuración de CORS.",
-    );
+    throw new ExcavacionError("red", abortado ? t.errorTimeout : t.errorRed);
   } finally {
     clearTimeout(reloj);
   }
@@ -60,15 +55,14 @@ export async function excavar(repoUrl: string): Promise<ExpedienteResponse> {
   try {
     cuerpo = await resp.json();
   } catch {
-    throw new ExcavacionError("error_interno", "El servicio devolvió una respuesta ilegible.");
+    throw new ExcavacionError("error_interno", t.errorIlegible);
   }
 
   if (!resp.ok) {
     const e = cuerpo as Partial<{ error: CodigoError; mensaje: string }>;
-    throw new ExcavacionError(
-      e?.error ?? "error_interno",
-      e?.mensaje ?? `El servicio respondió ${resp.status}.`,
-    );
+    // El backend ya devuelve `mensaje` en el idioma pedido; el fallback es
+    // por si la respuesta no trae cuerpo legible.
+    throw new ExcavacionError(e?.error ?? "error_interno", e?.mensaje ?? t.errorServicio(resp.status));
   }
 
   return cuerpo as ExpedienteResponse;

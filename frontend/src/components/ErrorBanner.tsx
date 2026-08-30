@@ -1,23 +1,12 @@
+import { TEXTOS, type Idioma } from "../i18n";
 import type { CodigoError } from "../types";
 
 interface Props {
   codigo: CodigoError;
   mensaje: string;
+  idioma: Idioma;
   onReintentar?: () => void;
 }
-
-/* El backend ya manda un mensaje legible; el título le da contexto de un vistazo. */
-const TITULOS: Record<CodigoError, string> = {
-  url_invalida: "URL no válida",
-  repo_no_encontrado: "No hay nada que excavar aquí",
-  rate_limit: "Demasiadas excavaciones",
-  github_no_responde: "GitHub no contesta",
-  narrador_no_responde: "El historiador enmudeció",
-  token_invalido: "Problema de configuración del servicio",
-  error_interno: "Algo se derrumbó",
-  sin_configurar: "Frontend sin configurar",
-  red: "No se pudo llegar al servicio",
-};
 
 /* Solo tiene sentido reintentar lo que puede salir distinto la próxima vez. */
 const REINTENTABLES: CodigoError[] = [
@@ -27,14 +16,17 @@ const REINTENTABLES: CodigoError[] = [
   "red",
 ];
 
-export function ErrorBanner({ codigo, mensaje, onReintentar }: Props) {
+export function ErrorBanner({ codigo, mensaje, idioma, onReintentar }: Props) {
+  const t = TEXTOS[idioma];
   return (
     <div className="error" role="alert">
-      <p className="error-titulo">{TITULOS[codigo] ?? "Error"}</p>
+      {/* El título lo pone el frontend; el detalle viene del backend, que ya
+          lo devuelve en el idioma que se le pidió. */}
+      <p className="error-titulo">{t.errores[codigo] ?? t.errores.error_interno}</p>
       <p className="error-mensaje">{mensaje}</p>
       {onReintentar && REINTENTABLES.includes(codigo) && (
         <button className="boton boton-secundario" type="button" onClick={onReintentar}>
-          Reintentar
+          {t.reintentar}
         </button>
       )}
     </div>

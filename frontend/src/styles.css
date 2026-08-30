@@ -315,3 +315,32 @@ body {
   .cuerpo p { text-align: left; }
   .boton, .entrada { width: 100%; }
 }
+
+/* --- Selector de idioma --- */
+.cabecera-fila {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.cabecera-fila .kicker { margin: 0; }
+
+.idioma {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: baseline;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.16em;
+  padding: 0.3rem 0.6rem;
+  color: var(--tinta-suave);
+  background: transparent;
+  border: 1px solid var(--linea);
+  border-radius: 2px;
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.idioma:hover { border-color: var(--sepia); }
+.idioma:focus-visible { outline: 2px solid var(--sepia); outline-offset: 2px; }
+.idioma-activo { color: var(--sello); font-weight: 700; }

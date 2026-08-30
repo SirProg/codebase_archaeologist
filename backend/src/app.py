@@ -10,13 +10,13 @@ import excavacion
 import github_client
 import renderer
 import storage
-from errors import ArqueologoError, UrlInvalida
+from errors import IDIOMA_DEFECTO, ArqueologoError, UrlInvalida, normalizar_idioma
 
 logging.getLogger().setLevel(logging.INFO)
 log = logging.getLogger(__name__)
 
 TOKEN_PARAM = os.environ.get("GITHUB_TOKEN_PARAM", "/codebase-archaeologist/github-token")
-EXPIRACION_TEXTO = "7 días"
+EXPIRACION_TEXTO = {"es": "7 días", "en": "7 days"}
 
 # Cacheados fuera del handler para reutilizarlos entre invocaciones tibias.
 _token: str | None = None
@@ -49,9 +49,12 @@ def lambda_handler(event, context):
     try:
         body = json.loads(event.get("body") or "{}")
     except json.JSONDecodeError:
-        return _respuesta(400, UrlInvalida("El cuerpo de la petición no es JSON válido.").as_dict())
+        # Sin body legible no hay idioma que leer: se responde en el de defecto.
+        return _respuesta(400, UrlInvalida("json").as_dict(IDIOMA_DEFECTO))
 
     repo_url = body.get("repo_url") or ""
+    # Acepta "en", "es", "en-US"… y cae al defecto ante cualquier otra cosa.
+    idioma = normalizar_idioma(body.get("idioma") or body.get("lang"))
 
     try:
         # Se valida y parsea aquí para poder mirar la cache antes de gastar
@@ -59,12 +62,12 @@ def lambda_handler(event, context):
         owner, nombre = github_client.parse_repo_url(repo_url)
         owner_repo = f"{owner}/{nombre}"
 
-        key_html = renderer.key_html(owner_repo)
-        key_md = renderer.key_md(owner_repo)
+        key_html = renderer.key_html(owner_repo, idioma)
+        key_md = renderer.key_md(owner_repo, idioma)
 
         # Cache: si ya excavamos este repo hoy, devolvemos el expediente guardado.
         if storage.existe(key_html) and storage.existe(key_md):
-            log.info("cache hit repo=%s", owner_repo)
+            log.info("cache hit repo=%s idioma=%s", owner_repo, idioma)
             return _respuesta(
                 200,
                 {
@@ -72,12 +75,13 @@ def lambda_handler(event, context):
                     "repo": owner_repo,
                     "narrativa": storage.leer(key_md),
                     "commits_analizados": excavacion.MAX_COMMITS,
-                    "expira_en": EXPIRACION_TEXTO,
+                    "expira_en": EXPIRACION_TEXTO[idioma],
+                    "idioma": idioma,
                     "cache": True,
                 },
             )
 
-        resultado = excavacion.excavar(repo_url, _github_token())
+        resultado = excavacion.excavar(repo_url, _github_token(), idioma)
 
         storage.subir(key_html, resultado["html"])
         storage.subir(key_md, resultado["narrativa"], "text/markdown; charset=utf-8")
@@ -89,15 +93,16 @@ def lambda_handler(event, context):
                 "repo": resultado["repo"],
                 "narrativa": resultado["narrativa"],
                 "commits_analizados": len(resultado["commits"]),
-                "expira_en": EXPIRACION_TEXTO,
+                "expira_en": EXPIRACION_TEXTO[idioma],
+                "idioma": idioma,
                 "cache": False,
             },
         )
 
     except ArqueologoError as exc:
         log.warning("error esperado repo_url=%r: %s", repo_url[:120], exc.mensaje)
-        return _respuesta(exc.codigo_http, exc.as_dict())
+        return _respuesta(exc.codigo_http, exc.as_dict(idioma))
     except Exception:
         # Nunca un stack trace crudo hacia el usuario.
         log.exception("error inesperado repo_url=%r", repo_url[:120])
-        return _respuesta(500, ArqueologoError().as_dict())
+        return _respuesta(500, ArqueologoError().as_dict(idioma))

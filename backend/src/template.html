@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="es">
+<html lang="{{LANG}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Expediente · {{REPO}}</title>
+<title>{{TITULO}} · {{REPO}}</title>
 <style>
   /* Un solo archivo, sin CDNs: este HTML tiene que abrirse aunque S3 sea lo
      único que responda. */
@@ -191,11 +191,11 @@
   <article class="expediente">
     <header class="membrete">
       <div class="clasificacion">
-        <span>Expediente de arqueología de software</span>
-        <span>Ref. {{REF}}</span>
+        <span>{{CLASIFICACION}}</span>
+        <span>{{ETIQUETA_REF}} {{REF}}</span>
       </div>
       <div class="sujeto">{{REPO}}</div>
-      <div class="sello">Excavado</div>
+      <div class="sello">{{SELLO}}</div>
     </header>
 
     <div class="cuerpo">
@@ -203,14 +203,14 @@
     </div>
 
     <section class="anexo">
-      <h2>Anexo · Estratos examinados</h2>
+      <h2>{{ANEXO}}</h2>
       <ol>
         {{COMMITS}}
       </ol>
     </section>
 
     <footer class="pie">
-      Redactado el {{FECHA}} · Amazon Nova · Codebase Archaeologist
+      {{PIE}} {{FECHA}} · Amazon Nova · Codebase Archaeologist
     </footer>
   </article>
 </body>
